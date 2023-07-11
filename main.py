@@ -1,10 +1,9 @@
 import tkinter as tk
-from tkinter import filedialog
 import random
 import time
 import timeit
 import matplotlib.pyplot as plt
-import os
+
 class Application(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -19,37 +18,88 @@ class Application(tk.Tk):
         self.about_menu.add_command(label="О программе", command=self.show_about)
         self.menu.add_cascade(label="Меню", menu=self.about_menu)
 
-        # Создаем кнопки и поле для выбора файла
-        self.open_button = tk.Button(self, text="Открыть файл", command=self.open_file)
+        # Создаем кнопки и поле для выбора типа последовательности
+        self.generate_button = tk.Button(self, text="Генерация последовательности", command=self.generate_sequence)
         self.exit_button = tk.Button(self, text="Выход", command=self.quit)
-        self.file_path_label = tk.Label(self, text="Путь к файлу:")
-        self.file_path_entry = tk.Entry(self)
+        self.num_count_label = tk.Label(self, text="Количество чисел:")
+        self.num_count_entry = tk.Entry(self)
+        self.sequence_type_label = tk.Label(self, text="Тип:")
+        self.sequence_type_var = tk.StringVar()
+        self.sequence_type_var.set("Случайная")
+        self.sequence_type_menu = tk.OptionMenu(self, self.sequence_type_var, "Случайная", "Повторяющаяся", "Упорядоченная")
 
         # Позиционируем элементы на форме
-        self.file_path_label.pack()
-        self.file_path_entry.pack()
-        self.open_button.pack()
+        self.num_count_label.pack()
+        self.num_count_entry.pack()
+        self.sequence_type_label.pack()
+        self.sequence_type_menu.pack()
+        self.generate_button.pack()
         self.exit_button.pack()
 
-    def open_file(self):
-        file_path = filedialog.askopenfilename()
+        # Создаем метки и текстовые поля для вывода результатов и времени выполнения
+        self.result_label_1 = tk.Label(self, text="Терпеливая сортировка:")
+        self.result_label_1.pack()
+        self.result_text_1 = tk.Text(self, width=30, height=5)
+        self.result_text_1.pack()
 
-        try:
-            with open(file_path, 'r') as file:
-                sequence = []
-                for line in file:
-                    numbers = line.strip().split()
-                    sequence.extend(map(int, numbers))
+        self.result_label_2 = tk.Label(self, text="Поразрядная сортировка:")
+        self.result_label_2.pack()
+        self.result_text_2 = tk.Text(self, width=30, height=5)
+        self.result_text_2.pack()
 
-            sorted_sequence_1, time_1, comparisons_1, swaps_1 = self.patience_sort(sequence)
-            sorted_sequence_2, time_2, comparisons_2, swaps_2 = self.radix_sort(sequence)
+        self.time_label_1 = tk.Label(self, text="Время выполнения терпеливой сортировки:")
+        self.time_label_1.pack()
+        self.time_text_1 = tk.Text(self, width=30, height=1)
+        self.time_text_1.pack()
 
-            # Выводим результаты и время выполнения
-            self.plot_graph(sequence, sorted_sequence_1, sorted_sequence_2, time_1, time_2, comparisons_1,
-                            comparisons_2, swaps_1, swaps_2, file_path)
+        self.time_label_2 = tk.Label(self, text="Время выполнения поразрядной сортировки:")
+        self.time_label_2.pack()
+        self.time_text_2 = tk.Text(self, width=30, height=1)
+        self.time_text_2.pack()
 
-        except FileNotFoundError:
-            print("Файл не найден.")
+    def generate_sequence(self):
+        num_count = int(self.num_count_entry.get())
+        sequence_type = self.sequence_type_var.get()  # Получаем выбранный тип последовательности
+
+        if sequence_type == "Случайная":
+            sequence = self.generate_random_sequence(num_count)
+        elif sequence_type == "Повторяющаяся":
+            sequence = self.generate_repeating_sequence(num_count)
+        elif sequence_type == "Упорядоченная":
+            sequence = self.generate_ordered_sequence(num_count)
+
+        # Отсортируем последовательность двумя методами
+        sorted_sequence_1, time_1, comparisons_1, swaps_1 = self.patience_sort(sequence)
+        sorted_sequence_2, time_2, comparisons_2, swaps_2 = self.radix_sort(sequence)
+
+        # Выводим результаты и время выполнения
+        self.result_text_1.delete('1.0', tk.END)
+        self.result_text_1.insert(tk.END, str(sorted_sequence_1))
+
+        self.result_text_2.delete('1.0', tk.END)
+        self.result_text_2.insert(tk.END, str(sorted_sequence_2))
+
+        self.time_text_1.delete('1.0', tk.END)
+        self.time_text_1.insert(tk.END, str(time_1))
+
+        self.time_text_2.delete('1.0', tk.END)
+        self.time_text_2.insert(tk.END, str(time_2))
+
+        self.plot_graph(sequence, sorted_sequence_1, sorted_sequence_2, comparisons_1, comparisons_2, swaps_1, swaps_2,
+                        sequence_type)
+
+    def generate_random_sequence(self, num_count):
+        sequence = [random.randint(1, 100) for _ in range(num_count)]
+        return sequence
+
+    def generate_repeating_sequence(self, num_count):
+        num = random.randint(1, 100)
+        sequence = [num] * num_count
+        return sequence
+
+    def generate_ordered_sequence(self, num_count):
+        sequence = list(range(1, num_count + 1))
+        return sequence
 
     def patience_sort(self, sequence):
         sequence = list(map(int, sequence))
@@ -97,7 +147,6 @@ class Application(tk.Tk):
         elapsed_time_str = "{:.9f}".format(elapsed_time)
 
         return sorted_sequence, elapsed_time_str, comparisons, swaps
-
     def radix_sort(self, sequence):
         sequence = list(map(int, sequence))
         comparisons = 0  # Количество сравнений
@@ -126,37 +175,32 @@ class Application(tk.Tk):
         sorted_sequence = sequence
         return sorted_sequence, elapsed_time_str, comparisons, swaps
 
-    def plot_graph(self, sequence, sorted_sequence_1, sorted_sequence_2, time_1, time_2, comparisons_1, comparisons_2,
-                   swaps_1, swaps_2, file_path):
+    def plot_graph(self, sequence, sorted_sequence_1, sorted_sequence_2, comparisons_1, comparisons_2, swaps_1, swaps_2,
+                   sequence_type):
         # Создаем списки для количества сравнений и перестановок
         comparisons = [comparisons_1, comparisons_2]
         swaps = [swaps_1, swaps_2]
 
-        # Извлекаем только имя файла из полного пути
-        file_name = os.path.basename(file_path)
+        # Создаем графическую диаграмму
+        labels = ['Терпеливая сортировка', 'Поразрядная сортировка']
+        comparisons_values = comparisons
+        swaps_values = swaps
 
         # Создаем фигуру и подграфики
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
 
         # Диаграмма для количества сравнений
-        labels = ['Терпеливая сортировка', 'Поразрядная сортировка']
-        comparisons_values = [comparisons_1, comparisons_2]
         ax1.bar(labels, comparisons_values)
         ax1.set_ylabel('Количество сравнений')
-        ax1.set_title('Сравнения для файла: ' + file_name)
+        ax1.set_title('Сравнения по типу последовательности: ' + sequence_type)
 
         # Диаграмма для количества перестановок
-        ax2.bar(labels, swaps)
+        ax2.bar(labels, swaps_values)
         ax2.set_ylabel('Количество перестановок')
-
-        # Добавляем время работы сортировок
-        ax2.text(0, -20, time_1 + ' сек', ha='center', fontsize=12, fontweight='bold')
-        ax2.text(1, -20, time_2 + ' сек', ha='center', fontsize=12, fontweight='bold')
 
         # Размещение диаграмм на форме
         plt.tight_layout()
         plt.show()
-
     def show_about(self):
         # Окно "О программе"
         about_window = tk.Toplevel(self)
