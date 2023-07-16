@@ -3,6 +3,82 @@ import random
 import time
 import timeit
 import matplotlib.pyplot as plt
+import os
+class FileGenerationWindow(tk.Toplevel):
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Генерация файла")
+        self.parent = parent
+
+        # Создаем элементы управления для выбора названия файла и типа последовательности
+        self.file_name_label = tk.Label(self, text="Название файла:")
+        self.file_name_entry = tk.Entry(self)
+        self.sequence_type_label = tk.Label(self, text="Тип последовательности:")
+        self.sequence_type_var = tk.StringVar(self)
+        self.sequence_type_var.set("Упорядоченная по возрастанию")
+        self.sequence_type_menu = tk.OptionMenu(self, self.sequence_type_var,
+                                                "Упорядоченная по возрастанию",
+                                                "Упорядоченная по убыванию",
+                                                "Случайная")
+        self.digits_label = tk.Label(self, text="Количество разрядов для чисел:")
+        self.digits_entry = tk.Entry(self)
+        self.elements_label = tk.Label(self, text="Количество элементов:")
+        self.elements_entry = tk.Entry(self)
+        self.generate_button = tk.Button(self, text="Сгенерировать", command=self.generate_file)
+
+        # Позиционируем элементы на форме
+        self.file_name_label.pack()
+        self.file_name_entry.pack()
+        self.sequence_type_label.pack()
+        self.sequence_type_menu.pack()
+        self.digits_label.pack()
+        self.digits_entry.pack()
+        self.elements_label.pack()
+        self.elements_entry.pack()
+        self.generate_button.pack()
+
+    def generate_file(self):
+        # Получаем значения из элементов управления
+        file_name = self.file_name_entry.get()
+        sequence_type = self.sequence_type_var.get()
+        digits = int(self.digits_entry.get())
+        elements = int(self.elements_entry.get())
+
+        # Генерируем последовательность чисел в соответствии с выбранным типом
+        if sequence_type == "Упорядоченная по возрастанию":
+            sequence = generate_ordered_sequence(digits, elements, "Упорядоченная по возрастанию")
+        elif sequence_type == "Упорядоченная по убыванию":
+            sequence = generate_ordered_sequence(digits, elements, "Упорядоченная по убыванию")
+        elif sequence_type == "Случайная":
+            sequence = [random.randint(10 ** (digits - 1), 10 ** digits - 1) for _ in range(elements)]
+
+        # Формируем полный путь к файлу в текущей директории проекта
+        current_dir = os.getcwd()
+        file_path = os.path.join(current_dir, file_name + ".txt")
+
+        try:
+            with open(file_path, 'w') as file:
+                for number in sequence:
+                    file.write(str(number) + " ")
+
+            # Выводим сообщение о успешной генерации файла
+            print("Файл успешно сгенерирован:", file_path)
+
+        except FileNotFoundError:
+            print("Ошибка при сохранении файла.")
+
+
+def generate_ordered_sequence(digits, elements, order):
+    sequence = []
+    current_number = 10 ** digits - 1 if order == "Упорядоченная по убыванию" else 10 ** (digits - 1)
+    step = -1 if order == "Упорядоченная по убыванию" else 1
+
+    for _ in range(elements):
+        sequence.append(current_number)
+        current_number += step
+
+    return sequence
+
 
 class Application(tk.Tk):
     def __init__(self):
@@ -18,89 +94,38 @@ class Application(tk.Tk):
         self.about_menu.add_command(label="О программе", command=self.show_about)
         self.menu.add_cascade(label="Меню", menu=self.about_menu)
 
-        # Создаем кнопки и поле для выбора типа последовательности
-        self.generate_button = tk.Button(self, text="Генерация последовательности", command=self.generate_sequence)
+        # Создаем кнопки и поле для выбора файла
+        self.open_button = tk.Button(self, text="Открыть файл", command=self.open_file)
         self.exit_button = tk.Button(self, text="Выход", command=self.quit)
-        self.num_count_label = tk.Label(self, text="Количество чисел:")
-        self.num_count_entry = tk.Entry(self)
-        self.sequence_type_label = tk.Label(self, text="Тип:")
-        self.sequence_type_var = tk.StringVar()
-        self.sequence_type_var.set("Случайная")
-        self.sequence_type_menu = tk.OptionMenu(self, self.sequence_type_var, "Случайная", "Повторяющаяся", "Упорядоченная")
+        self.generate_button = tk.Button(self, text="Генерация", command=self.open_generation_window)
 
         # Позиционируем элементы на форме
-        self.num_count_label.pack()
-        self.num_count_entry.pack()
-        self.sequence_type_label.pack()
-        self.sequence_type_menu.pack()
+        self.open_button.pack()
         self.generate_button.pack()
         self.exit_button.pack()
 
-        # Создаем метки и текстовые поля для вывода результатов и времени выполнения
-        self.result_label_1 = tk.Label(self, text="Терпеливая сортировка:")
-        self.result_label_1.pack()
-        self.result_text_1 = tk.Text(self, width=30, height=5)
-        self.result_text_1.pack()
+    def open_file(self):
+        file_path = filedialog.askopenfilename()
 
-        self.result_label_2 = tk.Label(self, text="Поразрядная сортировка:")
-        self.result_label_2.pack()
-        self.result_text_2 = tk.Text(self, width=30, height=5)
-        self.result_text_2.pack()
+        try:
+            with open(file_path, 'r') as file:
+                sequence = []
+                for line in file:
+                    numbers = line.strip().split()
+                    sequence.extend(map(int, numbers))
 
-        self.time_label_1 = tk.Label(self, text="Время выполнения терпеливой сортировки:")
-        self.time_label_1.pack()
-        self.time_text_1 = tk.Text(self, width=30, height=1)
-        self.time_text_1.pack()
+            sorted_sequence_1, time_1, comparisons_1, swaps_1 = self.patience_sort(sequence)
+            sorted_sequence_2, time_2, comparisons_2, swaps_2 = self.radix_sort(sequence)
 
-        self.time_label_2 = tk.Label(self, text="Время выполнения поразрядной сортировки:")
-        self.time_label_2.pack()
-        self.time_text_2 = tk.Text(self, width=30, height=1)
-        self.time_text_2.pack()
+            # Выводим результаты и время выполнения
+            self.plot_graph(sequence, sorted_sequence_1, sorted_sequence_2, time_1, time_2, comparisons_1,
+                            comparisons_2, swaps_1, swaps_2, file_path)
 
-    def generate_sequence(self):
-        num_count = int(self.num_count_entry.get())
-        sequence_type = self.sequence_type_var.get()  # Получаем выбранный тип последовательности
+        except FileNotFoundError:
+            print("Файл не найден.")
 
-        if sequence_type == "Случайная":
-            sequence = self.generate_random_sequence(num_count)
-        elif sequence_type == "Повторяющаяся":
-            sequence = self.generate_repeating_sequence(num_count)
-        elif sequence_type == "Упорядоченная":
-            sequence = self.generate_ordered_sequence(num_count)
-
-        # Отсортируем последовательность двумя методами
-        sorted_sequence_1, time_1, comparisons_1, swaps_1 = self.patience_sort(sequence)
-        sorted_sequence_2, time_2, comparisons_2, swaps_2 = self.radix_sort(sequence)
-
-        # Выводим результаты и время выполнения
-        self.result_text_1.delete('1.0', tk.END)
-        self.result_text_1.insert(tk.END, str(sorted_sequence_1))
-
-        self.result_text_2.delete('1.0', tk.END)
-        self.result_text_2.insert(tk.END, str(sorted_sequence_2))
-
-        self.time_text_1.delete('1.0', tk.END)
-        self.time_text_1.insert(tk.END, str(time_1))
-
-        self.time_text_2.delete('1.0', tk.END)
-        self.time_text_2.insert(tk.END, str(time_2))
-
-        self.plot_graph(sequence, sorted_sequence_1, sorted_sequence_2, comparisons_1, comparisons_2, swaps_1, swaps_2,
-                        sequence_type)
-
-    def generate_random_sequence(self, num_count):
-        sequence = [random.randint(1, 100) for _ in range(num_count)]
-        return sequence
-
-    def generate_repeating_sequence(self, num_count):
-        num = random.randint(1, 100)
-        sequence = [num] * num_count
-        return sequence
-
-    def generate_ordered_sequence(self, num_count):
-        sequence = list(range(1, num_count + 1))
-        return sequence
-
+    def open_generation_window(self):
+        generation_window = FileGenerationWindow(self)
     def patience_sort(self, sequence):
         sequence = list(map(int, sequence))
 
