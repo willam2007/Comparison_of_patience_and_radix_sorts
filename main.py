@@ -1,9 +1,11 @@
 import tkinter as tk
 import random
+from tkinter import filedialog
 import time
 import timeit
 import matplotlib.pyplot as plt
 import os
+
 class FileGenerationWindow(tk.Toplevel):
     def __init__(self, parent):
         super().__init__(parent)
@@ -104,28 +106,102 @@ class Application(tk.Tk):
         self.generate_button.pack()
         self.exit_button.pack()
 
+        # Создаем гистограммы
+        self.fig = None
+        self.axs = None
+
     def open_file(self):
-        file_path = filedialog.askopenfilename()
+        file_paths = filedialog.askopenfilenames()
+
+        if not file_paths:
+            return
 
         try:
-            with open(file_path, 'r') as file:
-                sequence = []
-                for line in file:
-                    numbers = line.strip().split()
-                    sequence.extend(map(int, numbers))
+            swaps = []
+            comparisons = []
+            times = []
 
-            sorted_sequence_1, time_1, comparisons_1, swaps_1 = self.patience_sort(sequence)
-            sorted_sequence_2, time_2, comparisons_2, swaps_2 = self.radix_sort(sequence)
+            max_swaps = 0
+            max_comparisons = 0
+            max_time = 0.0
 
-            # Выводим результаты и время выполнения
-            self.plot_graph(sequence, sorted_sequence_1, sorted_sequence_2, time_1, time_2, comparisons_1,
-                            comparisons_2, swaps_1, swaps_2, file_path)
+            for file_path in file_paths:
+                with open(file_path, 'r') as file:
+                    sequence = []
+                    for line in file:
+                        numbers = line.strip().split()
+                        sequence.extend(map(int, numbers))
+
+                    sorted_sequence_1, time_1, comparisons_1, swaps_1 = self.patience_sort(sequence)
+                    sorted_sequence_2, time_2, comparisons_2, swaps_2 = self.radix_sort(sequence)
+
+                    swaps.append((swaps_1, swaps_2))
+                    comparisons.append((comparisons_1, comparisons_2))
+                    times.append((float(time_1), float(time_2)))
+
+                    # Обновляем максимальные значения
+                    max_swaps = max(max_swaps, swaps_1, swaps_2)
+                    max_comparisons = max(max_comparisons, comparisons_1, comparisons_2)
+                    max_time = max(max_time, float(time_1), float(time_2))
+
+            self.create_histograms(len(file_paths), max_swaps, max_comparisons, max_time)
+            self.update_histograms(file_paths, swaps, comparisons, times)
+            self.show_histograms()
 
         except FileNotFoundError:
-            print("Файл не найден.")
+            print("Файл(ы) не найден(ы).")
+
+    def create_histograms(self, num_files, max_swaps, max_comparisons, max_time):
+        self.fig, self.axs = plt.subplots(3, num_files, figsize=(8 * num_files, 6))
+
+        for i in range(num_files):
+            ax_swaps = self.axs[0, i]
+            ax_comparisons = self.axs[1, i]
+            ax_time = self.axs[2, i]
+
+            ax_swaps.set_xlabel("Файл " + str(i + 1))
+            ax_comparisons.set_xlabel("Файл " + str(i + 1))
+            ax_time.set_xlabel("Файл " + str(i + 1))
+
+            ax_swaps.set_ylabel("Количество перестановок")
+            ax_comparisons.set_ylabel("Количество сравнений")
+            ax_time.set_ylabel("Время (сек)")
+
+            ax_swaps.set_ylim(0, max_swaps)
+            ax_comparisons.set_ylim(0, max_comparisons)
+            ax_time.set_ylim(0, max_time)
+
+    def update_histograms(self, file_paths, swaps, comparisons, times):
+        num_files = len(file_paths)
+
+        for i in range(num_files):
+            file_name = os.path.basename(file_paths[i])
+            ax_swaps = self.axs[0, i]
+            ax_comparisons = self.axs[1, i]
+            ax_time = self.axs[2, i]
+
+            # Разбиваем данные по категориям
+            swaps_1, swaps_2 = swaps[i]
+            comparisons_1, comparisons_2 = comparisons[i]
+            time_1, time_2 = times[i]
+
+            # Строим гистограммы для каждой категории
+            ax_swaps.bar([1, 2], [swaps_1, swaps_2], color=['blue', 'green'])
+            ax_comparisons.bar([1, 2], [comparisons_1, comparisons_2], color=['blue', 'green'])
+            ax_time.bar([1, 2], [time_1, time_2], color=['blue', 'green'])
+
+            # Добавляем подписи к диаграммам
+            ax_swaps.set_title("Перестановки (" + file_name + ")")
+            ax_comparisons.set_title("Сравнения (" + file_name + ")")
+            ax_time.set_title("Время (" + file_name + ")")
+
+    def show_histograms(self):
+        plt.tight_layout()
+        plt.show()
 
     def open_generation_window(self):
         generation_window = FileGenerationWindow(self)
+
     def patience_sort(self, sequence):
         sequence = list(map(int, sequence))
 
@@ -172,6 +248,7 @@ class Application(tk.Tk):
         elapsed_time_str = "{:.9f}".format(elapsed_time)
 
         return sorted_sequence, elapsed_time_str, comparisons, swaps
+
     def radix_sort(self, sequence):
         sequence = list(map(int, sequence))
         comparisons = 0  # Количество сравнений
@@ -200,32 +277,6 @@ class Application(tk.Tk):
         sorted_sequence = sequence
         return sorted_sequence, elapsed_time_str, comparisons, swaps
 
-    def plot_graph(self, sequence, sorted_sequence_1, sorted_sequence_2, comparisons_1, comparisons_2, swaps_1, swaps_2,
-                   sequence_type):
-        # Создаем списки для количества сравнений и перестановок
-        comparisons = [comparisons_1, comparisons_2]
-        swaps = [swaps_1, swaps_2]
-
-        # Создаем графическую диаграмму
-        labels = ['Терпеливая сортировка', 'Поразрядная сортировка']
-        comparisons_values = comparisons
-        swaps_values = swaps
-
-        # Создаем фигуру и подграфики
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
-
-        # Диаграмма для количества сравнений
-        ax1.bar(labels, comparisons_values)
-        ax1.set_ylabel('Количество сравнений')
-        ax1.set_title('Сравнения по типу последовательности: ' + sequence_type)
-
-        # Диаграмма для количества перестановок
-        ax2.bar(labels, swaps_values)
-        ax2.set_ylabel('Количество перестановок')
-
-        # Размещение диаграмм на форме
-        plt.tight_layout()
-        plt.show()
     def show_about(self):
         # Окно "О программе"
         about_window = tk.Toplevel(self)
@@ -237,10 +288,10 @@ class Application(tk.Tk):
         about_label.pack()
 
         # Добавляем информацию о программе
-        info_label = tk.Label(about_window, text="Разработчик: Ваше имя")
+        info_label = tk.Label(about_window, text="Разработчик: Волчков Николай")
         info_label.pack()
 
-        version_label = tk.Label(about_window, text="Версия программы: 1.0")
+        version_label = tk.Label(about_window, text="Версия программы: 1.5")
         version_label.pack()
 
 
